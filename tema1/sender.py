@@ -16,41 +16,41 @@ if sys.argv[1] not in ['ecb', 'cfb']:
     exit(0)
 
 key = os.urandom(16)
-block_enc = AES.new(key, AES.MODE_ECB, os.urandom(16))
+aes = AES.new(key, AES.MODE_ECB, os.urandom(16))
 
-s = socket.socket()
+r = socket.socket()
 port = 8080
-s.connect(('127.0.0.1', port))
+r.connect(('127.0.0.1', port))
 
 # initial handshake
-s.send(sys.argv[1].encode())
-response = s.recv(2).decode()
+r.send(sys.argv[1].encode())
+response = r.recv(2).decode()
 if response == 'no':
     print('Negative response received after communicating encryption mode. Exiting...')
     exit(0)
-s.send(encrypt_and_return_key(key))
+r.send(encrypt_and_return_key(key))
 
 if sys.argv[1] == 'ecb':
     for i in range(0, len(text_to_send), 16):
-        block = text_to_send[i:min(len(text_to_send), i + 16)]
-        while len(block) < 16: block += " "
-        s.send(block_enc.encrypt(block))
+        plaintext = text_to_send[i:min(len(text_to_send), i + 16)]
+        while len(plaintext) < 16: plaintext += " "
+        r.send(aes.encrypt(plaintext))
 elif sys.argv[1] == 'cfb':
     iv = b'sixteen byte iv '
     for i in range(0, len(text_to_send), 16):
-        block = text_to_send[i:min(len(text_to_send), i + 16)]
-        while len(block) < 16: block += " "
+        plaintext = text_to_send[i:min(len(text_to_send), i + 16)]
+        while len(plaintext) < 16: plaintext += " "
 
         # encrypt the iv
-        enc_iv = block_enc.encrypt(iv)
+        enc_iv = aes.encrypt(iv)
 
         # xor with the plaintext and send
-        plaintext_xor = bytes([(a ^ b) for a, b in zip(block.encode(), enc_iv)])
-        s.send(plaintext_xor)
+        cyphertext = bytes([(a ^ b) for a, b in zip(plaintext.encode(), enc_iv)])
+        r.send(cyphertext)
 
         # updating the iv
-        iv = plaintext_xor
+        iv = cyphertext
 else:
     pass
 
-s.close()
+r.close()

@@ -6,55 +6,55 @@ def decrypt_and_return_key(key):
     return enc.decrypt(key)
 
 port = 8080
-s = socket.socket()
-s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-s.bind(('', port))
-s.listen(5)    
+r = socket.socket()
+r.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+r.bind(('', port))
+r.listen(5)    
 print(f'listening at port {port}...')
 
-c, addr = s.accept()
+s, addr = r.accept()
 
 # primesc cheia criptata, o decriptez si imi fac un block cipher decryptor
-mode = c.recv(3).decode()
+mode = s.recv(3).decode()
 if mode in ['ecb', 'cfb']:
-    c.send(b'ok')
+    s.send(b'ok')
 else:
-    c.send(b'no')
+    s.send(b'no')
     exit(0)
-encrypted_key = c.recv(16)
+encrypted_key = s.recv(16)
 key = decrypt_and_return_key(encrypted_key)
 
-block_dec = AES.new(key, AES.MODE_ECB, os.urandom(16))
+aes = AES.new(key, AES.MODE_ECB, os.urandom(16))
 
 text_to_print = ""
 if mode == 'ecb':
     while True:
-        encrypted_block = c.recv(16)
-        if len(encrypted_block) == 0:
+        cyphertext = s.recv(16)
+        if len(cyphertext) == 0:
             break
-        text_to_print += block_dec.decrypt(encrypted_block).decode()
+        text_to_print += aes.decrypt(cyphertext).decode()
 
     print(text_to_print)
 elif mode == 'cfb':
     iv = b'sixteen byte iv '
     while True:
-        encrypted_block = c.recv(16)
-        if len(encrypted_block) == 0:
+        cyphertext = s.recv(16)
+        if len(cyphertext) == 0:
             break
 
         # encrypt the iv
-        enc_iv = block_dec.encrypt(iv)
+        enc_iv = aes.encrypt(iv)
 
         # xor with the cyphertext
-        cyphertext_xor = bytes([(a ^ b) for a, b in zip(encrypted_block, enc_iv)])
+        plaintext = bytes([(a ^ b) for a, b in zip(cyphertext, enc_iv)]).decode()
 
         # concatenate the result to the final text
-        text_to_print += cyphertext_xor.decode()
+        text_to_print += plaintext
 
         # update the iv
-        iv = encrypted_block
+        iv = cyphertext
 
     print(text_to_print)
 else:
     pass
-c.close()
+s.close()
